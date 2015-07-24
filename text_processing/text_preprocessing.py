@@ -16,21 +16,43 @@ import numpy as np
 import os
 import nltk
 import re
+import nltk.data
 
 from keras.preprocessing import sequence, text
 from keras.utils import np_utils
 from keras.datasets import imdb
 from bs4 import BeautifulSoup
-from nltk.corpus import stopwords 
 
+txt = "that is so readily applicable across academic disciplines.  Since<bear> dAWG I am especially 12-14 intrigued by the intersection between Computer Science and Neuroscience, 1st I am pursuing the Mind, Brain, Behavior focus track within Harvard's Computer Science concentration."
+sentence_detector = nltk.data.load('tokenizers/punkt/english.pickle')
 
-""" take in raw text, returns unicode text without html markup, etc"""
-def clean_text (raw_text) :
+""" take in raw text, converts each sentence to list of words 
+	without html markup, etc, and returns list of sentence lists."""
+# pass in text detector so don't keep reloading for each file
+def clean_text (raw_text, detector) :
     text = BeautifulSoup(raw_text, "html.parser").get_text()    
-    letters_only = re.sub("[^a-zA-Z]", " ", text) 
-    word_lst = letters_only.lower().split()                             
-    return word_lst
-   #return (" ".join(words))
+    sentences = detector.tokenize(text.strip())
+    # go through and convert each sentence to a list of lowercase tokens
+    sentence_list = []
+    for sentence in sentences :
+		text = sentence.lower()
+		word_lst = re.findall(r"\w+(?:[-']\w+)*|'|[-.(]+|\S\w*", text)
+		sentence_list.append(word_lst)
+    return sentence_list
+
+pattern = r'''(?x)    # set flag to allow verbose regexps
+...     ([A-Z]\.)+        # abbreviations, e.g. U.S.A.
+...   | \w+(-\w+)*        # words with optional internal hyphens
+...   | \$?\d+(\.\d+)?%?  # currency and percentages, e.g. $12.40, 82%
+...   | \.\.\.            # ellipsis
+...   | [][.,;"'?():-_`]  # these are separate tokens; includes ],
+'''
+a = nltk.regexp_tokenize(txt, pattern)
+
+
+# test for sentence functionality
+cleaned =clean_text(txt, sentence_detector)
+
 
 # todo:
 # function to run one-time to produce google dictionary pkl file
@@ -78,35 +100,42 @@ def randomize_dict (word_dict, seed) :
 # TO FIX POTENTIALLY: is there an alternative to re-constructing this dict each time?
 # it seems like this is the only way to ensure that someone really could not convert
 # from the randomized text back to text ???
-def parse_file (file_path, word_dict, seed) :
+def parse_file (file_path, word_dict, detector, seed) :
 	# read in file and get rid of markup
 	with open(file_path, 'r') as f :
-		cleaned = clean_text(f.read())
+		cleaned_sentences = clean_text(f.read(), detector)
 	# randomize dictionary according to seed
 	np.random.seed(seed)
-	rand_dict = dict(
-		zip(word_dict.keys(), np.random.permutation(word_dict.values())))
-	# convert word list to sequence
-	sequence = []
-	for word in cleaned :
-		# if word not in dictionary don't include
-		if word in rand_dict :
-			sequence.append(rand_dict[word])
-	return sequence
+	#rand_dict = dict(
+	#	zip(word_dict.keys(), np.random.permutation(word_dict.values())))
+	
+	# for testing
+	rand_dict = word_dict	
+	# convert each sentence to a sequence
+	sequence_list = []
+	for sentence in cleaned_sentences :
+		sequence = []
+		for word in sentence :
+			# if word not in dictionary don't include
+			if word in rand_dict :
+				sequence.append(rand_dict[word])
+		sequence_list.append(sequence)
+	return sequence_list
 
 
 
 # testing --> convert randomized seq to the same seq outputted by tokenizer
 
 # fix random seed generator and test to make sure still works
-test_seed = os.urandom(10)
+test_seed = 19
 rand = randomize_dict(words, test_seed)
 num_conversion = {}
 for word in rand :
 	num_conversion[rand[word]] = words[word]
-app = parse_file('/fs3/home/enagaraj/project/test_files/768.statement_of_purpose.Eela_Nagaraj.txt', words, test_seed)
-short_app = parse_file('/fs3/home/enagaraj/project/test_files/short_statement.txt', words, test_seed)
+app = parse_file('/fs3/home/enagaraj/project/test_files/768.statement_of_purpose.Eela_Nagaraj.txt', words, sentence_detector, test_seed)
+short_app = parse_file('/fs3/home/enagaraj/project/test_files/short_statement.txt', words, sentence_detector, test_seed)
 
+"""
 unrandomized = []
 for num in short_app :
 	unrandomized.append(num_conversion[num])
@@ -128,7 +157,7 @@ seq = tokenizer.texts_to_sequences(txt)
 
 print [unrandomized] == seq
 
-
+"""
 """ process first num_files files in a directory and output list of strings
 	and list of labels with corresponding indices  """
 def process_text_files(file_dir, num_files) :
