@@ -17,7 +17,6 @@ import sys
 """ take in raw text, converts each sentence to list of lowercase
 	words and returns list of sentence word lists."""
 def clean_text (raw_text, detector) :
-	raw_text = raw_text.decode(encoding='UTF-8')
 	# nltk's sophisticated method for detecting sentence boundaries
 	sentences = detector.tokenize(raw_text.strip())
 	pattern = r'''(?x)
@@ -27,11 +26,8 @@ def clean_text (raw_text, detector) :
 		| \.\.\.            				# ellipsis
 		| [][.,;"'?():-_`] '''				# punctuation
 	# convert each sentence to a list of lowercase tokens
-	sentence_list = []
-	for sentence in sentences :
-		text = sentence.lower()
-		word_lst = nltk.regexp_tokenize(text, pattern)
-		sentence_list.append(word_lst)
+	sentence_list = [nltk.regexp_tokenize(sentence.lower(),pattern) 
+		for sentence in sentences]
 	return sentence_list
 
 
@@ -45,40 +41,46 @@ def load_dictionary(file_path, max_index) :
 			l = line.split(' ')
 			words[l[0]] = count
 			count -= 1
-	# save as pickle file???
 	return words
 
 
 """ takes a text file and encodes it as a reproducibly random
 	numerical sequence. The sequence cannot be converted back to
 	a word sequence without the seed value. """
-def parse_file (data, word_dict, detector, seed) :
-	# MAKE SURE DATA IS UTF-8 ENCODED!!!
-	cleaned_sentences = clean_text(data, detector)
+def parse_file (file_path, word_dict, detector, seed) :
+	# read in file and get rid of markup
+	with codecs.open(file_path, 'r', 'utf-8') as f :
+		cleaned_sentences = clean_text(f.read(), detector)
 	# randomize dictionary according to seed
 	np.random.seed(seed)
 	rand_dict = dict(
 		zip(word_dict.keys(), np.random.permutation(word_dict.values())))
 	# convert each sentence to a sequence
-	sequence_list = []
-	for sentence in cleaned_sentences :
-		sequence = []
-		for word in sentence :
-			# if word not in dictionary don't include
-			if word in rand_dict :
-				sequence.append(rand_dict[word])
-		sequence_list.append(sequence)
-	sys.stdout.write(str(sequence_list))
-	#print sequence_list
+	sequence_list = [[rand_dict[word] for word in sentence if word in rand_dict] 
+		for sentence in cleaned_sentences]
+	return sequence_list
 
 
 """ actual script to be run """
-# load these parameters once, then pass into parse function
-google_100k = load_dictionary(
-	'/fs3/group/chlgrp/datasets/Google-1grams/Google-1grams-top100k.txt', 100000)
+# load these parameters once then pass into parse function
+google_100k = load_dictionary('/fs3/group/chlgrp/datasets/Google-1grams/Google-1grams-top100k.txt', 100000)
 seed = np.random.randint(0, 4294967295)
-detector = nltk.data.load('tokenizers/punkt/english.pickle')
+sentence_detector = nltk.data.load('tokenizers/punkt/english.pickle')
 
-#data = sys.stdin.read()
-# parse_file(data, google_100k, detector, seed)
+# call parse_file(file_path, google_100k, sentence_detector, seed) for
+# each file in t
+app = parse_file('/fs3/home/enagaraj/project/test_files/768.statement_of_purpose.Eela_Nagaraj.txt', google_100k, sentence_detector, seed)
 
+
+
+"""
+
+rand = randomize_dict(words, test_seed)
+num_conversion = {}
+for word in rand :
+	num_conversion[rand[word]] = words[word]
+app = parse_file('/fs3/home/enagaraj/project/test_files/768.statement_of_purpose.Eela_Nagaraj.txt', words, sentence_detector, test_seed)
+short_app = parse_file('/fs3/home/enagaraj/project/test_files/short_statement.txt', words, sentence_detector, test_seed)
+
+
+"""
