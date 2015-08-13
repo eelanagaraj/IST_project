@@ -5,3 +5,5 @@ text_processing/SoP-train-yes/
 text_processing/test_seqs/
 text_processing/data.pkl
 text_processing/sep_files.pkl
+SoP-train-yes.zip
+SoP-train-no.zip
