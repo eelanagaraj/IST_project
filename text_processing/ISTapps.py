@@ -28,15 +28,14 @@ def extract_sequences(file_path) :
 		for str_seq in raw_text if has_num(str_seq)]
 	if seq_list :
 		return seq_list
-	#else :
-		#return None
+	else :
+		return None
 
 """ For late/early fusion stuff, each application is a seq list.
 	Return a list of sequence arrays, and corresponding labels for
 	each application (not for individual sentences)"""
 def process_apps (pos_file_dir, neg_file_dir, maxlen) :
-	pos_apps = []
-	neg_apps = []
+	pos_apps, neg_apps = [], []
 	# list comp is less efficient since need to check that extract returns val
 	for filename in os.listdir(pos_file_dir) :
 		extracted = extract_sequences(os.path.join(pos_file_dir, filename))
@@ -52,11 +51,6 @@ def process_apps (pos_file_dir, neg_file_dir, maxlen) :
 	y = [1]*len(pos_apps) + [0]*len(neg_apps)
 	X = pos_apps + neg_apps
 	return (X,y)
-
-# tests
-#(X,y) = process_apps('/fs3/home/enagaraj/project/text_processing/SoP-train-yes',
-# '/fs3/home/enagaraj/project/text_processing/SoP-train-no')
-
 
 """ extract sequences from all text files in a directory
 	return one large sequence list """
@@ -90,6 +84,25 @@ def pickle_data(yes_dir, no_dir):
 		open('/fs3/home/enagaraj/project/text_processing/data.pkl', 'wb'), 
 		protocol=pkl.HIGHEST_PROTOCOL)
 
+""" helper function that converts data divided by app into
+	one array of sequences and corresponding label array
+	** can use in main function before testing apps as well **"""
+def extract_from_apps (X_prime, y_prime, maxlen, seed=107, shuffle=True) :
+	# convert train set into a huge block of sequences and shuffle again
+	X, y = [], []
+	for i,app in enumerate(X_prime) :
+		# update labels as well
+		y.extend([y_prime[i]]*len(app))
+		X.extend(app)
+	assert (len(X) == len(y))
+	# shuffle if set
+	if shuffle :
+		np.random.seed(seed)
+		np.random.shuffle(X)
+		np.random.seed(seed)
+		np.random.shuffle(y)
+	return (sequence.pad_sequences(X,maxlen), np.asarray(y))
+
 
 """loader function which downloads pickled data and labels, shuffles by seed,
 	and pads to maximum length maxlen. Returns unsplit data,labels: (X,y)"""
@@ -113,24 +126,10 @@ def load_ISTapps (maxlen, seed=107) :
 
 	return (X,y)
 
-""" helper function that converts data divided by app into
-	one list of sequences and corresponding labels
-	** can use in main function before testing apps as well **"""
-def extract_from_apps (X_prime, y_prime) :
-	# convert train set into a huge block of sequences and shuffle again
-	X, y = [], []
-	for i,app in enumerate(X_prime) :
-		# update labels as well
-		y.extend([y_prime[i]]*len(app))
-		X.extend(app)
-	assert (len(X) == len(y))
-	return (X,y)
 
-
-""" shuffle the sequences by applications -- test split contains whole apps """
-# PAD SEQUENCES IF NEEDBE?????
-
-def load_apps_shuffled (maxlen, seed=107, test_split=0.2) :
+""" load data where each app is a data point.
+	Return shuffled set of applications and corresponding labels per app. """
+def load_apps_shuffled (maxlen, seed=107) :
 	# load data and store for faster future access
 	pkl_file = '/fs3/home/enagaraj/project/text_processing/sep_files.pkl'
 	if not (os.path.isfile(pkl_file)) :
@@ -147,15 +146,21 @@ def load_apps_shuffled (maxlen, seed=107, test_split=0.2) :
 	np.random.shuffle(X)
 	np.random.seed(seed)
 	np.random.shuffle(y)
-	# split into train and test sets
+	return (X,y)
+
+
+
+"""	# split into train and test sets
 	split_point = int(len(X)*(1-test_split))
 	X_train = X[:split_point]
 	y_train = y[:split_point]
 	X_test = X[split_point:]
 	y_test = y[split_point:]
 	# convert train set into a huge block of sequences and shuffle again
-	(X_train, y_train) = extract_from_apps(X_train, y_train)
-	return (X_train, y_train), (X_test, y_test)
+	(X_train, y_train) = extract_from_apps(X_train, y_train, seed=seed, shuffle=True)
+	return (X_train, y_train), (X_test, y_test) """
 
-# testzzz
-(X_train, y_train), (X_test, y_test) = load_apps_shuffled(30, 111, 0.2)
+(X1,y1) = load_apps_shuffled(30, 107)
+(X,y) = load_ISTapps(30,107)
+(X2, y2) = extract_from_apps(X1[:1], y1[:1], 30, seed=107, shuffle=True)
+(X3, y3) = extract_from_apps(X1[:1], y1[:1], 30, seed=107, shuffle=False)
