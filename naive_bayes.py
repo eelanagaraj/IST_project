@@ -46,42 +46,7 @@ def naive_bayes (X_train, y_train, X_test, y_test) :
 	pos_percent = sum(y_train) / (len(y_train) * 1.0)
 	# predict on test data based on occurrence ratios
 	avg_sentence_probs = [avg_word_probabilities(sentence, ratios) for sentence in X_test]
-	preds_55 = [int(pos > neg and pos > 0.55) for pos,neg in avg_sentence_probs]
-	preds_percent = [int(pos > neg and pos > pos_percent) for pos,neg in avg_sentence_probs]
-	acc55 = np_utils.accuracy(preds_55, y_test)
-	accperc = np_utils.accuracy(preds_percent, y_test)
-	return acc55, accperc, preds_55, preds_percent, avg_sentence_probs, ratios, pos_percent
+	preds = [int(pos > pos_percent) for pos,neg in avg_sentence_probs]
+	acc = np_utils.accuracy(preds, y_test)
+	return acc, preds
 
-test_split = 0.2
-maxlen = 50
-max_features = 100000
-k = 5
-seeds = range(1, 100)
-seed_avgs_55 = [0]*len(seeds)
-seed_avgs_perc = [0]*len(seeds)
-for seed in seeds :
-	# cross validation
-	X,y = ISTapps.load_ISTapps(maxlen, seed=seed)
-	X = np.asarray(X)
-	y = np.asarray(y)
-
-	kfold_indices = cross_validation.KFold(len(X), n_folds=k)
-	cv_round = 0
-	cumulative_acc_55 = [0]*k
-	cumulative_acc_perc = [0]*k
-	for train_indices, test_indices in kfold_indices :
-		X_train = X[train_indices]
-		y_train = y[train_indices]
-		X_test = X[test_indices]
-		y_test = y[test_indices]
-
-		acc55,accperc,preds_55, preds_percent, avg_sentence_probs,ratios,pos_percent = naive_bayes(X_train, y_train, X_test, y_test)
-		cumulative_acc_55[cv_round] = acc55
-		cumulative_acc_perc[cv_round] = accperc
-
-		cv_round += 1
-	seed_avgs_55[seed-1] = sum(cumulative_acc_55) / k
-	seed_avgs_perc[seed-1] = sum(cumulative_acc_perc) / k
-
-# try multiplying all pos occurrence ratios to find 
-# maybe eliminate ratios for words that are too popular ??? e.g. top 100 most common words or something?
